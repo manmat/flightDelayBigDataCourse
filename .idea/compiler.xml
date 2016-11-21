@@ -22,11 +22,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="true" />
-        <module name="flightDelayBigDataCourse" />
+        <module name="flightDelay" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="flightDelayBigDataCourse" target="1.5" />
+      <module name="flightDelay" target="1.6" />
     </bytecodeTargetLevel>
   </component>
 </project>

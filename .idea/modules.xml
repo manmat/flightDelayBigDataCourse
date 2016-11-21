@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/flightDelayBigDataCourse.iml" filepath="$PROJECT_DIR$/flightDelayBigDataCourse.iml" />
+      <module fileurl="file://$PROJECT_DIR$/flightDelay/flightDelay.iml" filepath="$PROJECT_DIR$/flightDelay/flightDelay.iml" />
     </modules>
   </component>
 </project>
