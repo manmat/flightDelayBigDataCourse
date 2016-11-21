@@ -14,7 +14,7 @@ object App {
     val sc = new SparkContext(conf)
     val data = sc.textFile(args(0))
     val numAs = data.filter(line => line.contains("a")).count()
-    val numBs = data.filter(line => line.contains("b")).count()
+    val numBs = data.filter(line => line.contains("A")).count()
     println(s"Lines with a: ${numAs}, Lines with b: ${numBs}")
   }
 }
