@@ -105,7 +105,7 @@ object App {
     val assembler = new VectorAssembler()
      .setInputCols(
        Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
-         "DepDelay", "DepTime", "ArrDelay","Distance", "AirportBusinessDest",
+         "DepDelay", "DepTime","Distance" , "AirportBusinessDest",
          "AirportBusinessOrig", "CRSElapsedTime"))
      .setOutputCol("features")
 
@@ -120,19 +120,37 @@ object App {
       .setStages(Array(assembler, lr))
 
     val lrModel = pipeline_model.fit(trainingData)
-    lrModel
+
     println(lrModel)
-    lrModel.transform(testData).show
+    val predictions = lrModel.transform(testData)
 
-    //val lrModel = lr.fit(output)
-/*
-    println(s"Coefficients: ${lrModel.coefficients}")
-    println(s"Intercept: ${lrModel.intercept}")
-    val trainingSummary = lrModel.summary
+    predictions.select("ArrDelay", "prediction").show()
+
+    // alternative approach
+    val output = assembler.transform(trainingData)
+    val lrModel2 = lr.fit(output)
+    println("Model 1 was fit using parameters: " + lrModel2.parent.extractParamMap)
+
+
+    // Print the coefficients and intercept for linear regression
+    println(lrModel2.featuresCol)
+    println(s"Coefficients: ${lrModel2.coefficients} Intercept: ${lrModel2.intercept}")
+
+    val trainingSummary = lrModel2.summary
     println(s"numIterations: ${trainingSummary.totalIterations}")
+    println(s"objectiveHistory: ${trainingSummary.objectiveHistory.toList}")
+    trainingSummary.residuals.show()
+    println(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
+    println(s"r2: ${trainingSummary.r2}")
 
-    lrModel.coefficients.toArray.foreach(x => println(x))
-      */
+    /*
+        println(s"Coefficients: ${lrModel.coefficients}")
+        println(s"Intercept: ${lrModel.intercept}")
+        val trainingSummary = lrModel.summary
+        println(s"numIterations: ${trainingSummary.totalIterations}")
+
+        lrModel.coefficients.toArray.foreach(x => println(x))
+          */
     // validation measures
 }
 }
