@@ -6,16 +6,14 @@ package eit
 
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
-
 import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
 import org.apache.spark.ml.regression.LinearRegression
-import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.{Pipeline, PipelineStage}
 import org.apache.spark.ml.feature.VectorAssembler
-
 import org.apache.log4j.{Level, Logger}
+import Array._
 
 
 object App {
@@ -64,25 +62,20 @@ object App {
       .setOutputCol(i + "Index")
       .fit(relevant)
     }
-
     val encoders = to_index.map{i => new OneHotEncoder()
       .setInputCol(i + "Index")
       .setOutputCol(i + "Vec")
     }
 
-    val pipeline_index = new Pipeline()
-      .setStages(indexers.toArray)
+    val collection :Array[PipelineStage] = concat(indexers.toArray, encoders.toArray)
 
     val pipeline_encode = new Pipeline()
-      .setStages(encoders.toArray)
+      .setStages(collection)
 
-    val indexed = pipeline_index.fit(relevant).transform(relevant)
-    val encoded = pipeline_encode.fit(indexed).transform(indexed)
-    encoded.show
+    val encoded = pipeline_encode.fit(relevant).transform(relevant)
 
 
     // add airport business for origin and destination
-
     val size_airport_orig = encoded.groupBy("Origin").count()
     val size_airport_dest = encoded.groupBy("Dest").count()
 
@@ -91,10 +84,7 @@ object App {
       .join(size_airport_dest, "Dest")
       .withColumnRenamed("count", "AirportBusinessDest")
 
-
-    joined.show()
-
-
+    // drop forbidden columns
     val converted = joined.select(
       joined("MonthVec"),
       joined("DayofMonthVec"),
@@ -105,10 +95,9 @@ object App {
       joined("ArrDelay").cast(DoubleType),
       joined("Distance").cast(DoubleType),
       joined("AirportBusinessDest").cast(DoubleType),
-      joined("AirportBusinessOrig").cast(DoubleType)
+      joined("AirportBusinessOrig").cast(DoubleType),
+      joined("CRSElapsedTime").cast(DoubleType)
     ).where("ArrDelay is not null")
-
-    converted.show
 
 
     val Array(trainingData, testData) = converted.randomSplit(Array(0.7, 0.3))
@@ -117,7 +106,7 @@ object App {
      .setInputCols(
        Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
          "DepDelay", "DepTime", "ArrDelay","Distance", "AirportBusinessDest",
-         "AirportBusinessOrig"))
+         "AirportBusinessOrig", "CRSElapsedTime"))
      .setOutputCol("features")
 
 
@@ -131,6 +120,7 @@ object App {
       .setStages(Array(assembler, lr))
 
     val lrModel = pipeline_model.fit(trainingData)
+    lrModel
     println(lrModel)
     lrModel.transform(testData).show
 
