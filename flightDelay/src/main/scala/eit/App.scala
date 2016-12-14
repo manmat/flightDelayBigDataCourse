@@ -8,6 +8,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions
 import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
 import org.apache.spark.ml.regression.LinearRegression
 import org.apache.spark.ml.{Pipeline, PipelineStage}
@@ -43,6 +44,26 @@ object App {
       .option("mode", "DROPMALFORMED")
       .load(args(0))
 
+    val new_data = data.select(
+      functions.concat(
+        data("Year"),
+        functions.lit("-"),
+        data("Month"),
+        functions.lit("-"),
+        data("DayofMonth")
+      ).as("date"),
+      functions.when(
+        data("CRSDepTime") < 1200, "Morning"
+      ).otherwise(functions.when(data("CRSDepTime") < 1900, "Afternoon").otherwise("Night")).as("DayTime"),
+      data("Origin"),
+      data("Dest")
+    )
+
+    new_data.show()
+
+
+    //use cache??
+    // make loggin work!!
 
     // add airport business for origin and destination
     val size_airport_orig = data.groupBy("Origin").count()
@@ -127,10 +148,12 @@ object App {
     // split into train and test datasets
     val Array(trainingData, testData) = converted.randomSplit(Array(0.7, 0.3), seed = 12546)
 
-    val model = tvs.fit(trainingData)
+    val lrModel = tvs.fit(trainingData)
     //val cvModel = cv.fit(trainingData)
-    val predictions = model.transform(testData)
+    val predictions = lrModel.transform(testData)
       .select("ArrDelay", "prediction")
+
+    predictions.show
 
     val metrics = new RegressionMetrics(predictions.rdd.map(x =>
       (x(0).asInstanceOf[Double], x(1).asInstanceOf[Double])))
@@ -140,33 +163,13 @@ object App {
     println(s"r2: ${metrics.r2}")
     println(s"Explained Variance: ${metrics.explainedVariance}")
 
-
     /*
 
-    val collection :Array[PipelineStage] = concat(indexers.toArray, encoders.toArray)
-
-    val pipeline_encode = new Pipeline().setStages(collection)
-
-    val encoded = pipeline_encode.fit(converted).transform(converted)
-
-
-
-
-    val pipeline_model = new Pipeline()
-      .setStages(Array(assembler, lr))
-
-    val lrModel = pipeline_model.fit(trainingData)
-
-    println(lrModel)
-    val predictions = lrModel.transform(testData)
-
-    predictions.select("ArrDelay", "prediction").show()
 
     // alternative approach
     val output = assembler.transform(trainingData)
     val lrModel2 = lr.fit(output)
     println("Model 1 was fit using parameters: " + lrModel2.parent.extractParamMap)
-    //Predicting the arrival delay of commercial flights, how to measure??
 
     // Print the coefficients and intercept for linear regression
     println(lrModel2.featuresCol)
