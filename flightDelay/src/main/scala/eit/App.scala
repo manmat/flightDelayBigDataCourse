@@ -32,6 +32,7 @@ object App {
     val conf = new SparkConf().setAppName("MyFirstSparkApplication").setMaster("local[1]")
     val sc = new SparkContext(conf)
 
+    sc.setLogLevel("OFF")
     val spark = SparkSession
       .builder()
       .appName("MyFirstSparkApplication")
@@ -47,26 +48,6 @@ object App {
       .option("sep",",")
       .option("mode", "DROPMALFORMED")
       .load(args(0))
-
-    val new_data = data.select(
-      functions.concat(
-        data("Year"),
-        functions.lit("-"),
-        data("Month"),
-        functions.lit("-"),
-        data("DayofMonth")
-      ).as("date"),
-      functions.when(
-        data("CRSDepTime") < 1200, "Morning"
-      ).otherwise(functions.when(data("CRSDepTime") < 1900, "Afternoon").otherwise("Night")).as("DayTime"),
-      data("Origin"),
-      data("Dest")
-    )
-
-    new_data.show()
-
-
-    // make loggin work!!
 
     // add airport business for origin and destination
     val size_airport_orig = data.groupBy("Origin").count()
@@ -85,6 +66,8 @@ object App {
       joined("DayofMonth"),
       joined("UniqueCarrier"),
       joined("DayOfWeek"),
+      joined("Origin"),
+      joined("Dest"),
       joined("DepDelay").cast(IntegerType),
       joined("CRSDepTime").cast(IntegerType),
       joined("ArrDelay").cast(DoubleType),
@@ -92,11 +75,31 @@ object App {
       joined("AirportBusinessDest").cast(DoubleType),
       joined("AirportBusinessOrig").cast(DoubleType),
       joined("CRSElapsedTime").cast(DoubleType),
-      joined("TaxiOut").cast(DoubleType)
-    ).where("ArrDelay is not null")
+      joined("TaxiOut").cast(DoubleType),
+      functions
+        .when(data("CRSDepTime") < 1200 && data("CRSDepTime") > 500, "Morning").otherwise(functions
+        .when(data("CRSDepTime") < 1900 && data("CRSDepTime") >= 1200, "Afternoon").otherwise("Night")).as("DayTime")
+    ).where("ArrDelay is not null and Cancelled = 0")
+
+
+    println("DATA UNDERSTANDING: \n")
+
+    converted.describe().show()
+    converted.groupBy("DayTime").count().orderBy("count").show()
+    println("Distinct values UniqueCarrier: "
+      + converted.select("UniqueCarrier").distinct().count().toString())
+    println("Distinct values Origin: "
+      + converted.select("Origin").distinct().count().toString())
+    println("Distinct values Dest: "
+      + converted.select("Dest").distinct().count().toString())
+
+    println("Correlation between ArrDelay and DepDelay: "
+      + converted.stat.corr("ArrDelay", "DepDelay").toString
+      + "\n")
+
 
     // add vector columns for categorical variables
-    val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth")
+    val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth", "DayTime")
 
     val indexers = to_index.map{i => new StringIndexer()
       .setInputCol(i)
@@ -108,12 +111,16 @@ object App {
       .setOutputCol(j + "Vec")
     }
 
+    val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
+      "DepDelay", "DayTimeVec","Distance" , "AirportBusinessDest",
+      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut")
+
+    println("Final Variables: ")
+    println(final_variables)
+
     // assemble features as vector
     val assembler = new VectorAssembler()
-      .setInputCols(
-        Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
-          "DepDelay", "CRSDepTime","Distance" , "AirportBusinessDest",
-          "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut"))
+      .setInputCols(final_variables)
       .setOutputCol("features")
 
     // build a linear model
@@ -140,13 +147,6 @@ object App {
       .setEstimatorParamMaps(paramGrid)
       .setTrainRatio(0.7)
 
-    val cv = new CrossValidator()
-      .setEstimator(pipeline)
-      .setEvaluator(new RegressionEvaluator().setLabelCol("ArrDelay"))
-      .setEstimatorParamMaps(paramGrid)
-      .setNumFolds(3)
-
-
     // split into train and test datasets
     val Array(trainingData, testData) = converted.randomSplit(Array(0.7, 0.3), seed = 12546)
 
@@ -155,11 +155,13 @@ object App {
     val predictions = lrModel.transform(testData)
       .select("ArrDelay", "prediction")
 
-    predictions.show
+    println("PREDICTIONS: ")
+    predictions.show(30)
 
     val metrics = new RegressionMetrics(predictions.rdd.map(x =>
       (x(0).asInstanceOf[Double], x(1).asInstanceOf[Double])))
 
+    println("MODEL METRICS: \n")
     println(s"RMSE: ${metrics.rootMeanSquaredError}")
     println(s"MSE: ${metrics.meanSquaredError}")
     println(s"r2: ${metrics.r2}")
