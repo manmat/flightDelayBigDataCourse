@@ -4,6 +4,8 @@ package eit
  * @author ${user.name}
  */
 
+import org.apache.log4j.{Level, Logger}
+import org.apache.hadoop.yarn.util.RackResolver
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
@@ -13,17 +15,19 @@ import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
 import org.apache.spark.ml.regression.LinearRegression
 import org.apache.spark.ml.{Pipeline, PipelineStage}
 import org.apache.spark.ml.feature.VectorAssembler
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit, CrossValidator}
-import org.apache.spark.ml.evaluation.{RegressionEvaluator}
+import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder, TrainValidationSplit}
+import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.Row
+
 import Array._
 
 
 object App {
   def main(args : Array[String]) {
-    Logger.getRootLogger().setLevel(Level.WARN)
+    Logger.getLogger(classOf[RackResolver]).getLevel
+    Logger.getLogger("org").setLevel(Level.OFF)
+    Logger.getLogger("akka").setLevel(Level.OFF)
 
     val conf = new SparkConf().setAppName("MyFirstSparkApplication").setMaster("local[1]")
     val sc = new SparkContext(conf)
@@ -62,7 +66,6 @@ object App {
     new_data.show()
 
 
-    //use cache??
     // make loggin work!!
 
     // add airport business for origin and destination
@@ -91,7 +94,6 @@ object App {
       joined("CRSElapsedTime").cast(DoubleType),
       joined("TaxiOut").cast(DoubleType)
     ).where("ArrDelay is not null")
-
 
     // add vector columns for categorical variables
     val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth")
@@ -164,7 +166,6 @@ object App {
     println(s"Explained Variance: ${metrics.explainedVariance}")
 
     /*
-
 
     // alternative approach
     val output = assembler.transform(trainingData)
