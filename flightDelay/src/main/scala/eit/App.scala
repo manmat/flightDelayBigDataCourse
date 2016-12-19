@@ -75,15 +75,18 @@ object App {
       joined("AirportBusinessDest").cast(DoubleType),
       joined("AirportBusinessOrig").cast(DoubleType),
       joined("CRSElapsedTime").cast(DoubleType),
-      joined("TaxiOut").cast(DoubleType),
+      // joined("TaxiOut").cast(DoubleType),
       functions
         .when(data("CRSDepTime") < 1200 && data("CRSDepTime") > 500, "Morning").otherwise(functions
         .when(data("CRSDepTime") < 1900 && data("CRSDepTime") >= 1200, "Afternoon").otherwise("Night")).as("DayTime")
-    ).where("ArrDelay is not null and Cancelled = 0")
+    ).where("ArrDelay is not null and Cancelled = 0 and Distance is not null")
 
 
     println("DATA UNDERSTANDING: \n")
 
+
+    println("Null values Distance: "
+      + converted.where("Distance is null").count())
     converted.describe().show()
     converted.groupBy("DayTime").count().orderBy("count").show()
     println("Distinct values UniqueCarrier: "
@@ -112,11 +115,11 @@ object App {
     }
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
-      "DepDelay", "DayTimeVec","Distance" , "AirportBusinessDest",
-      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut")
+      "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
+      "AirportBusinessOrig", "CRSElapsedTime")
 
     println("Final Variables: ")
-    println(final_variables)
+    final_variables.foreach(x => println(x))
 
     // assemble features as vector
     val assembler = new VectorAssembler()
