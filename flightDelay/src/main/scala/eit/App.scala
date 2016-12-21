@@ -18,6 +18,7 @@ import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder, TrainValidationSplit}
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.mllib.evaluation.RegressionMetrics
+import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.Row
 
 import Array._
@@ -75,31 +76,54 @@ object App {
       joined("AirportBusinessDest").cast(DoubleType),
       joined("AirportBusinessOrig").cast(DoubleType),
       joined("CRSElapsedTime").cast(DoubleType),
-      // joined("TaxiOut").cast(DoubleType),
+      joined("TaxiOut").cast(DoubleType),
       functions
         .when(data("CRSDepTime") < 1200 && data("CRSDepTime") > 500, "Morning").otherwise(functions
         .when(data("CRSDepTime") < 1900 && data("CRSDepTime") >= 1200, "Afternoon").otherwise("Night")).as("DayTime")
-    ).where("ArrDelay is not null and Cancelled = 0 and Distance is not null")
+    ).where("ArrDelay is not null and Cancelled = 0")
 
 
     println("DATA UNDERSTANDING: \n")
 
+    // drop columns wich have only one category or are empty
 
-    println("Null values Distance: "
-      + converted.where("Distance is null").count())
+    val to_drop = ArrayBuffer()
+    for (col <- converted.columns) {
+      val distinct = converted.select(col).distinct().count()
+      println("Distinct values " + col + ": " + distinct.toString())
+      if( distinct <= 1 ){
+        println(s"${col} has 1 distinct value or less and thus will be dropped")
+        to_drop :+ col
+      }
+    }
+
+    val total_count = converted.count()
+    val to_filter = StringBuilder.newBuilder
+    for (col <- converted.columns) {
+      val count = converted.where(col + " is null").count()
+      println("Missing values " + col + ": " + count.toString())
+      if( (count / total_count) < 0.05){
+        println(col + " has " + (count / total_count)*100 + "% missing values")
+        if(to_filter.length > 0){
+          to_filter.append("and")
+        }
+        to_filter.append(col + " is not null")
+      }
+      else{
+        to_drop :+ col
+      }
+    }
+
+    println(to_filter.toString())
+    to_drop.foreach(x => println(x))
+    val filtered = converted.where(to_filter.toString())
+
     converted.describe().show()
     converted.groupBy("DayTime").count().orderBy("count").show()
-    println("Distinct values UniqueCarrier: "
-      + converted.select("UniqueCarrier").distinct().count().toString())
-    println("Distinct values Origin: "
-      + converted.select("Origin").distinct().count().toString())
-    println("Distinct values Dest: "
-      + converted.select("Dest").distinct().count().toString())
 
     println("Correlation between ArrDelay and DepDelay: "
       + converted.stat.corr("ArrDelay", "DepDelay").toString
       + "\n")
-
 
     // add vector columns for categorical variables
     val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth", "DayTime")
@@ -116,7 +140,7 @@ object App {
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
       "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
-      "AirportBusinessOrig", "CRSElapsedTime")
+      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut") diff to_drop
 
     println("Final Variables: ")
     final_variables.foreach(x => println(x))
@@ -151,7 +175,7 @@ object App {
       .setTrainRatio(0.7)
 
     // split into train and test datasets
-    val Array(trainingData, testData) = converted.randomSplit(Array(0.7, 0.3), seed = 12546)
+    val Array(trainingData, testData) = filtered.randomSplit(Array(0.7, 0.3), seed = 12546)
 
     val lrModel = tvs.fit(trainingData)
     //val cvModel = cv.fit(trainingData)
@@ -169,27 +193,6 @@ object App {
     println(s"MSE: ${metrics.meanSquaredError}")
     println(s"r2: ${metrics.r2}")
     println(s"Explained Variance: ${metrics.explainedVariance}")
-
-    /*
-
-    // alternative approach
-    val output = assembler.transform(trainingData)
-    val lrModel2 = lr.fit(output)
-    println("Model 1 was fit using parameters: " + lrModel2.parent.extractParamMap)
-
-    // Print the coefficients and intercept for linear regression
-    println(lrModel2.featuresCol)
-    println(s"Coefficients:")
-    lrModel2.coefficients.toArray.foreach(x => println(x))
-    println(s"Intercept: ${lrModel2.intercept}")
-
-    val trainingSummary = lrModel2.summary
-    println(s"numIterations: ${trainingSummary.totalIterations}")
-    println(s"objectiveHistory: ${trainingSummary.objectiveHistory.toList}")
-    trainingSummary.residuals.show()
-    println(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
-    println(s"r2: ${trainingSummary.r2}")
-  */
 
   }
 }
