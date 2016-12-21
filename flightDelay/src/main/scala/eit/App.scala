@@ -99,7 +99,7 @@ object App {
 
     val total_count = converted.count()
     val to_filter = StringBuilder.newBuilder
-    for (col <- converted.columns) {
+    for (col <- converted.columns diff to_drop) {
       val count = converted.where(col + " is null").count()
       println("Missing values " + col + ": " + count.toString())
       if( (count / total_count) < 0.05){
