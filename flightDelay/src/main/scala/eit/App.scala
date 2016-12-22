@@ -109,13 +109,12 @@ object App {
         }
         to_filter.append(col + " is not null")
       }
-      else{
-        to_drop :+ col
+      if((count.toFloat != 0) && (count.toFloat / total_count) > 0.05){
+        to_drop.append(col)
       }
     }
 
-    println(to_filter.toString())
-    to_drop.foreach(x => println(x))
+    println("\n")
 
     val filtered = if( !to_filter.isEmpty ) {
       converted.where(to_filter.toString())
@@ -123,7 +122,6 @@ object App {
     else{
       converted
     }
-
 
     converted.describe().show()
     converted.groupBy("DayTime").count().orderBy("count").show()
@@ -135,11 +133,6 @@ object App {
     // add vector columns for categorical variables
     val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth", "DayTime").filter(!to_drop.contains(_))
 
-    println("To_drop: ")
-    to_drop.foreach(x => println(x))
-    println("To_index: ")
-    to_index.foreach(x => println(x))
-
     val indexers = to_index.map{i => new StringIndexer()
       .setInputCol(i)
       .setOutputCol(i + "Index")
@@ -149,6 +142,9 @@ object App {
       .setInputCol(j + "Index")
       .setOutputCol(j + "Vec")
     }
+
+    println("TO DROP: ")
+    println(to_drop.foreach(x => println(x)))
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
       "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
@@ -194,7 +190,7 @@ object App {
     val predictions = lrModel.transform(testData)
       .select("ArrDelay", "prediction")
 
-    println("PREDICTIONS: ")
+    println("\n PREDICTIONS: ")
     predictions.show(30)
 
     val metrics = new RegressionMetrics(predictions.rdd.map(x =>
