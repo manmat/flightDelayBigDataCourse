@@ -152,7 +152,7 @@ object App {
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
       "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
-      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut").filter(!to_index.map(_ + "Vec").contains(_)).filter(!to_drop.contains(_))
+      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut").filter(!to_drop.map(_ + "Vec").contains(_)).filter(!to_drop.contains(_))
 
     println("Final Variables: ")
     final_variables.foreach(x => println(x))
