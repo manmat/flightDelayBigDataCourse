@@ -102,10 +102,10 @@ object App {
     for (col <- converted.columns diff to_drop) {
       val count = converted.where(col + " is null").count()
       println("Missing values " + col + ": " + count.toString())
-      if( (count / total_count) < 0.05){
-        println(col + " has " + (count / total_count)*100 + "% missing values")
+      if( (count.toFloat != 0) && (count.toFloat / total_count) < 0.05){
+        println(col + " has " + (count.toFloat / total_count)*100 + "% missing values")
         if(to_filter.length > 0){
-          to_filter.append("and")
+          to_filter.append(" and ")
         }
         to_filter.append(col + " is not null")
       }
@@ -116,7 +116,14 @@ object App {
 
     println(to_filter.toString())
     to_drop.foreach(x => println(x))
-    val filtered = converted.where(to_filter.toString())
+
+    if( !to_filter.isEmpty ) {
+      val filtered = converted.where(to_filter.toString())
+    }
+    else{
+      val filtered = converted
+    }
+
 
     converted.describe().show()
     converted.groupBy("DayTime").count().orderBy("count").show()
