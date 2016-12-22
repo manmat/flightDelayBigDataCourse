@@ -87,19 +87,19 @@ object App {
 
     // drop columns wich have only one category or are empty
 
-    val to_drop = ArrayBuffer()
+    val to_drop = ArrayBuffer[String]()
     for (col <- converted.columns) {
       val distinct = converted.select(col).distinct().count()
       println("Distinct values " + col + ": " + distinct.toString())
       if( distinct <= 1 ){
         println(s"${col} has 1 distinct value or less and thus will be dropped")
-        to_drop :+ col
+        to_drop.append(col)
       }
     }
 
     val total_count = converted.count()
     val to_filter = StringBuilder.newBuilder
-    for (col <- converted.columns diff to_drop) {
+    for (col <- converted.columns.filter(!to_drop.contains(_))) {
       val count = converted.where(col + " is null").count()
       println("Missing values " + col + ": " + count.toString())
       if( (count.toFloat != 0) && (count.toFloat / total_count) < 0.05){
@@ -117,11 +117,11 @@ object App {
     println(to_filter.toString())
     to_drop.foreach(x => println(x))
 
-    if( !to_filter.isEmpty ) {
-      val filtered = converted.where(to_filter.toString())
+    val filtered = if( !to_filter.isEmpty ) {
+      converted.where(to_filter.toString())
     }
     else{
-      val filtered = converted
+      converted
     }
 
 
@@ -133,7 +133,12 @@ object App {
       + "\n")
 
     // add vector columns for categorical variables
-    val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth", "DayTime")
+    val to_index = List("DayOfWeek", "Month", "UniqueCarrier", "DayofMonth", "DayTime").filter(!to_drop.contains(_))
+
+    println("To_drop: ")
+    to_drop.foreach(x => println(x))
+    println("To_index: ")
+    to_index.foreach(x => println(x))
 
     val indexers = to_index.map{i => new StringIndexer()
       .setInputCol(i)
@@ -147,7 +152,7 @@ object App {
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
       "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
-      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut") diff to_drop
+      "AirportBusinessOrig", "CRSElapsedTime", "TaxiOut").filter(!to_index.map(_ + "Vec").contains(_)).filter(!to_drop.contains(_))
 
     println("Final Variables: ")
     final_variables.foreach(x => println(x))
