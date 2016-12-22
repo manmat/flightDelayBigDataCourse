@@ -126,6 +126,10 @@ object App {
     converted.describe().show()
     converted.groupBy("DayTime").count().orderBy("count").show()
 
+    if (!to_drop.contains("UniqueCarrier")) {
+      converted.groupBy("UniqueCarrier").agg(functions.avg("ArrDelay")).orderBy("avg(ArrDelay)").show()
+    }
+
     println("Correlation between ArrDelay and DepDelay: "
       + converted.stat.corr("ArrDelay", "DepDelay").toString
       + "\n")
@@ -142,9 +146,6 @@ object App {
       .setInputCol(j + "Index")
       .setOutputCol(j + "Vec")
     }
-
-    println("TO DROP: ")
-    println(to_drop.foreach(x => println(x)))
 
     val final_variables = Array("MonthVec", "DayofMonthVec","UniqueCarrierVec","DayOfWeekVec",
       "DepDelay", "DayTimeVec","Distance", "AirportBusinessDest",
